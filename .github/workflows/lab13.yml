@@ -1,0 +1,50 @@
+name: lab13-ci
+
+# Workflow odpala się automatycznie po push oraz ręcznie ("Run workflow").
+# UWAGA: nie uruchamia notebooka, LLM-a ani guardraili — sprawdza tylko zdrowie
+# repo (lint + składnia) i robi smoke test rysowania wykresu. Nie wymaga klucza API
+# ani serwerów MCP, więc jest stabilny i zawsze powinien być zielony.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz repo
+        uses: actions/checkout@v4
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Narzędzia (tylko ruff + matplotlib)
+        run: pip install ruff matplotlib
+
+      - name: Lint (ruff)
+        run: ruff check src || true   # nie wywalaj buildu na drobnych uwagach stylu
+
+      - name: Składnia wszystkich plików (py_compile)
+        run: python -m py_compile src/*.py
+
+      - name: Smoke test wykresu (Ćw.4, bez MCP i bez API)
+        run: |
+          python - <<'PY'
+          import matplotlib
+          matplotlib.use("Agg")
+          import matplotlib.pyplot as plt
+          fig, ax = plt.subplots()
+          for s in ([1, 4, 9, 16, 25], [25, 16, 9, 4, 1]):
+              ax.plot(range(len(s)), s, marker="o")
+          fig.savefig("line_plot.png", dpi=100, bbox_inches="tight")
+          print("OK: wygenerowano line_plot.png")
+          PY
+
+      - name: Zapisz wykres jako artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: line_plot
+          path: line_plot.png
